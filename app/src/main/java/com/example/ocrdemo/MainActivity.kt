@@ -36,14 +36,17 @@ class MainActivity : AppCompatActivity() {
     private var imageCapture: ImageCapture? = null
     private var cameraProvider: ProcessCameraProvider? = null
 
+    // Words collected from camera captures (keeps growing)
+    private val capturedWords = mutableListOf<String>()
+
     // Gallery picker
     // Gallery picker (multiple images)
     private val pickImages =
         registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris: List<Uri> ->
             if (uris.isNotEmpty()) {
                 stopCamera()
-                imageView.setImageURI(uris[0])   // preview the first image
-                runOcrMultiple(uris)
+                imageView.setImageURI(uris[0])
+                addImages(uris)
             }
         }
 
@@ -134,10 +137,7 @@ class MainActivity : AppCompatActivity() {
             ContextCompat.getMainExecutor(this),
             object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                    val uri = Uri.fromFile(file)
-                    stopCamera()
-                    imageView.setImageURI(uri)
-                    runOcr(uri)   // goes straight to OCR, no confirm screen
+                    addImages(listOf(Uri.fromFile(file)))
                 }
 
                 override fun onError(exc: ImageCaptureException) {
@@ -151,27 +151,17 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    // Used by the camera (one image)
-    private fun runOcr(uri: Uri) {
-        runOcrMultiple(listOf(uri))
-    }
-
-    // Used by the gallery (one or many images)
-    private fun runOcrMultiple(uris: List<Uri>) {
-        tvResult.text = "Reading ${uris.size} image(s)..."
-
-        val results = arrayOfNulls<String>(uris.size)
+    // Reads one or more images and adds their D words to the shared list
+    private fun addImages(uris: List<Uri>) {
+        val results = arrayOfNulls<List<String>>(uris.size)
         var finished = 0
 
         fun onOneDone() {
             finished++
-            tvResult.text = "Reading... $finished / ${uris.size}"
-
             if (finished == uris.size) {
-                tvResult.text = uris.indices.joinToString("\n\n") { i ->
-                    val body = results[i] ?: "Error"
-                    if (uris.size > 1) "Image ${i + 1}:\n$body" else body
-                }
+                // keep the order the images were picked in
+                results.forEach { list -> if (list != null) capturedWords.addAll(list) }
+                showWords()
             }
         }
 
@@ -181,36 +171,39 @@ class MainActivity : AppCompatActivity() {
 
                 recognizer.process(image)
                     .addOnSuccessListener { result ->
-                        results[index] = findDWords(result)
+                        results[index] = findDWordList(result)
                         onOneDone()
                     }
-                    .addOnFailureListener { e ->
-                        results[index] = "Error: ${e.message}"
+                    .addOnFailureListener {
+                        results[index] = emptyList()
                         onOneDone()
                     }
             } catch (e: Exception) {
-                results[index] = "Could not load image"
+                results[index] = emptyList()
                 onOneDone()
             }
         }
     }
 
-    // Keeps only words starting with D
-    private fun findDWords(result: com.google.mlkit.vision.text.Text): String {
-        val dWords = mutableListOf<String>()
+    private fun showWords() {
+        tvResult.text =
+            if (capturedWords.isEmpty()) "No words starting with D found"
+            else capturedWords.joinToString("\n")
+    }
 
+    // Returns the words starting with D
+    private fun findDWordList(result: com.google.mlkit.vision.text.Text): List<String> {
+        val words = mutableListOf<String>()
         for (block in result.textBlocks) {
             for (line in block.lines) {
                 for (element in line.elements) {
                     if (element.text.startsWith("D", ignoreCase = true)) {
-                        dWords.add(element.text)
+                        words.add(element.text)
                     }
                 }
             }
         }
-
-        return if (dWords.isEmpty()) "No words starting with D found"
-        else dWords.joinToString("\n")
+        return words
     }
 
     override fun onDestroy() {
