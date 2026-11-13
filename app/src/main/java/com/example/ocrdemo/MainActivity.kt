@@ -1,33 +1,44 @@
 package com.example.ocrdemo
 
-import android.os.Bundle
-import androidx.activity.enableEdgeToEdge
-import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import android.net.Uri
+import android.os.Bundle
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.FileProvider
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import java.io.File
 
 class MainActivity : AppCompatActivity() {
 
-    // The OCR engine (Latin script covers English, Malay, etc.)
     private val recognizer =
         TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
     private lateinit var imageView: ImageView
     private lateinit var tvResult: TextView
 
-    // Opens the gallery/file picker. No permission needed.
+    // Remembers where the camera should save the photo
+    private var cameraUri: Uri? = null
+
+    // Gallery picker
     private val pickImage =
         registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
             if (uri != null) {
+                imageView.setImageURI(uri)
+                runOcr(uri)
+            }
+        }
+
+    // Camera: returns true if the photo was taken successfully
+    private val takePicture =
+        registerForActivityResult(ActivityResultContracts.TakePicture()) { success: Boolean ->
+            val uri = cameraUri
+            if (success && uri != null) {
                 imageView.setImageURI(uri)
                 runOcr(uri)
             }
@@ -39,13 +50,27 @@ class MainActivity : AppCompatActivity() {
 
         imageView = findViewById(R.id.imageView)
         tvResult = findViewById(R.id.tvResult)
-        val btnPick = findViewById<Button>(R.id.btnPick)
 
-        btnPick.setOnClickListener {
+        findViewById<Button>(R.id.btnPick).setOnClickListener {
             pickImage.launch("image/*")
+        }
+
+        findViewById<Button>(R.id.btnCamera).setOnClickListener {
+            launchCamera()
         }
     }
 
+    private fun launchCamera() {
+        try {
+            val imagesDir = File(cacheDir, "images").apply { mkdirs() }
+            val photoFile = File(imagesDir, "photo_${System.currentTimeMillis()}.jpg")
+            val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", photoFile)
+            cameraUri = uri
+            takePicture.launch(uri)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Could not open camera: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
     private fun runOcr(uri: Uri) {
         tvResult.text = "Reading..."
         try {
@@ -53,8 +78,22 @@ class MainActivity : AppCompatActivity() {
 
             recognizer.process(image)
                 .addOnSuccessListener { result ->
+                    val dWords = mutableListOf<String>()
+
+                    // text -> blocks -> lines -> elements (words)
+                    for (block in result.textBlocks) {
+                        for (line in block.lines) {
+                            for (element in line.elements) {
+                                if (element.text.startsWith("D", ignoreCase = true)) {
+                                    dWords.add(element.text)
+                                }
+                            }
+                        }
+                    }
+
                     tvResult.text =
-                        if (result.text.isBlank()) "No text found" else result.text
+                        if (dWords.isEmpty()) "No words starting with D found"
+                        else dWords.joinToString("\n")
                 }
                 .addOnFailureListener { e ->
                     tvResult.text = "Error: ${e.message}"
