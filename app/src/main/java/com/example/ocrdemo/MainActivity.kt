@@ -12,8 +12,6 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageCapture
-import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -21,8 +19,15 @@ import androidx.core.content.ContextCompat
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
-import java.io.File
 import com.google.firebase.database.FirebaseDatabase
+import androidx.camera.core.ExperimentalGetImage
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
+import java.util.concurrent.Executors
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
+import android.os.Build
 
 class MainActivity : AppCompatActivity() {
 
@@ -31,18 +36,23 @@ class MainActivity : AppCompatActivity() {
     private val dbRef by lazy {
         FirebaseDatabase
             .getInstance("https://ocr-star-b3312-default-rtdb.asia-southeast1.firebasedatabase.app")
-            .getReference("lists/$secretCode")
+            .getReference("lists/$secretCode/pending")
+            //.getReference("lists/$secretCode")
     }
     private val recognizer =
         TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
     private lateinit var imageView: ImageView
     private lateinit var previewView: PreviewView
-    private lateinit var btnCapture: Button
     private lateinit var tvResult: TextView
 
-    private var imageCapture: ImageCapture? = null
     private var cameraProvider: ProcessCameraProvider? = null
+    private var imageAnalysis: ImageAnalysis? = null
+    private var lastScanTime = 0L
+
+    // Candidate number seen in the previous frame (for the 2-in-a-row check)
+    private var pendingNumber: String? = null
+    private val analysisExecutor = Executors.newSingleThreadExecutor()
 
     // Words collected from camera captures (keeps growing)
     private val capturedWords = mutableListOf<String>()
@@ -73,7 +83,6 @@ class MainActivity : AppCompatActivity() {
 
         imageView = findViewById(R.id.imageView)
         previewView = findViewById(R.id.previewView)
-        btnCapture = findViewById(R.id.btnCapture)
         tvResult = findViewById(R.id.tvResult)
 
         findViewById<Button>(R.id.btnPick).setOnClickListener {
@@ -81,10 +90,6 @@ class MainActivity : AppCompatActivity() {
         }
         findViewById<Button>(R.id.btnCamera).setOnClickListener {
             openCamera()
-        }
-
-        btnCapture.setOnClickListener {
-            capturePhoto()
         }
     }
 
@@ -99,7 +104,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun startCamera() {
         previewView.visibility = View.VISIBLE
-        btnCapture.visibility = View.VISIBLE
         imageView.visibility = View.GONE
 
         val future = ProcessCameraProvider.getInstance(this)
@@ -110,7 +114,11 @@ class MainActivity : AppCompatActivity() {
             val preview = Preview.Builder().build().also {
                 it.setSurfaceProvider(previewView.surfaceProvider)
             }
-            imageCapture = ImageCapture.Builder().build()
+
+            imageAnalysis = ImageAnalysis.Builder()
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .build()
+                .also { it.setAnalyzer(analysisExecutor) { proxy -> analyzeFrame(proxy) } }
 
             try {
                 provider.unbindAll()
@@ -118,7 +126,7 @@ class MainActivity : AppCompatActivity() {
                     this,
                     CameraSelector.DEFAULT_BACK_CAMERA,
                     preview,
-                    imageCapture
+                    imageAnalysis
                 )
             } catch (e: Exception) {
                 Toast.makeText(this, "Camera error: ${e.message}", Toast.LENGTH_LONG).show()
@@ -126,35 +134,58 @@ class MainActivity : AppCompatActivity() {
         }, ContextCompat.getMainExecutor(this))
     }
 
+    // Runs on each camera frame, at most every 250 ms
+    @androidx.annotation.OptIn(ExperimentalGetImage::class)
+    private fun analyzeFrame(proxy: ImageProxy) {
+        val now = System.currentTimeMillis()
+        val mediaImage = proxy.image
+        if (mediaImage == null || now - lastScanTime < 250) {
+            proxy.close()
+            return
+        }
+        lastScanTime = now
+
+        val image = InputImage.fromMediaImage(mediaImage, proxy.imageInfo.rotationDegrees)
+        recognizer.process(image)
+            .addOnSuccessListener { result -> confirmAndAdd(findDWordList(result)) }
+            .addOnCompleteListener { proxy.close() }   // must always close the frame
+    }
+
+    // Camera only: a number must be seen in 2 consecutive scans before it is added
+    private fun confirmAndAdd(numbers: List<String>) {
+        val candidate = numbers.firstOrNull { it.length == 9 && it.all { c -> c.isDigit() } }
+
+        if (candidate == null) {
+            pendingNumber = null          // nothing valid this frame, start over
+            return
+        }
+        if (candidate in capturedWords) {
+            pendingNumber = null          // already in the list, ignore
+            return
+        }
+
+        if (candidate == pendingNumber) {
+            pendingNumber = null
+            if (addNumbers(listOf(candidate))) vibrateShort()
+        } else {
+            pendingNumber = candidate     // first sighting, wait for the next frame
+        }
+    }
+
+    private fun vibrateShort() {
+        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            (getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(VIBRATOR_SERVICE) as Vibrator
+        }
+        vibrator.vibrate(VibrationEffect.createOneShot(120, VibrationEffect.DEFAULT_AMPLITUDE))
+    }
+
     private fun stopCamera() {
         cameraProvider?.unbindAll()
         previewView.visibility = View.GONE
-        btnCapture.visibility = View.GONE
         imageView.visibility = View.VISIBLE
-    }
-
-    private fun capturePhoto() {
-        val capture = imageCapture ?: return
-        val file = File(cacheDir, "photo_${System.currentTimeMillis()}.jpg")
-        val options = ImageCapture.OutputFileOptions.Builder(file).build()
-
-        capture.takePicture(
-            options,
-            ContextCompat.getMainExecutor(this),
-            object : ImageCapture.OnImageSavedCallback {
-                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                    addImages(listOf(Uri.fromFile(file)))
-                }
-
-                override fun onError(exc: ImageCaptureException) {
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Capture failed: ${exc.message}",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-            }
-        )
     }
 
     // Reads one or more images and adds the DO number to the shared list
@@ -166,13 +197,7 @@ class MainActivity : AppCompatActivity() {
             finished++
             if (finished == uris.size) {
                 // keep the order the images were picked in
-                results.forEach { list ->
-                    if (list != null) {
-                        capturedWords.addAll(list)
-                        // send only the new items to Firebase
-                        list.forEach { word -> dbRef.push().setValue(word) }
-                    }
-                }
+                results.forEach { list -> if (list != null) addNumbers(list) }
                 showWords()
             }
         }
@@ -195,6 +220,20 @@ class MainActivity : AppCompatActivity() {
                 onOneDone()
             }
         }
+    }
+
+    // Adds only valid, new numbers, and sends only those to Firebase
+    private fun addNumbers(numbers: List<String>): Boolean {
+        var added = false
+        for (n in numbers) {
+            if (n.length == 9 && n.all { it.isDigit() } && n !in capturedWords) {
+                capturedWords.add(n)
+                dbRef.push().setValue(n)
+                added = true
+            }
+        }
+        if (added) showWords()
+        return added
     }
 
     private fun showWords() {
@@ -239,5 +278,6 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         cameraProvider?.unbindAll()
         recognizer.close()
+        analysisExecutor.shutdown()
     }
 }
