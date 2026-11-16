@@ -1,15 +1,15 @@
+# Secrets
+app/google-services.json
+local.properties
+*.jks
+*.keystore
+
+# Build and IDE
 *.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
+.gradle/
+.idea/
+build/
+captures/
 .externalNativeBuild
 .cxx
-local.properties
+.DS_Stores

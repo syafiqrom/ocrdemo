@@ -22,9 +22,17 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.io.File
+import com.google.firebase.database.FirebaseDatabase
 
 class MainActivity : AppCompatActivity() {
 
+    private val secretCode = BuildConfig.SECRET_CODE
+
+    private val dbRef by lazy {
+        FirebaseDatabase
+            .getInstance("https://ocr-star-b3312-default-rtdb.asia-southeast1.firebasedatabase.app")
+            .getReference("lists/$secretCode")
+    }
     private val recognizer =
         TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
@@ -39,7 +47,6 @@ class MainActivity : AppCompatActivity() {
     // Words collected from camera captures (keeps growing)
     private val capturedWords = mutableListOf<String>()
 
-    // Gallery picker
     // Gallery picker (multiple images)
     private val pickImages =
         registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris: List<Uri> ->
@@ -72,7 +79,6 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnPick).setOnClickListener {
             pickImages.launch("image/*")
         }
-
         findViewById<Button>(R.id.btnCamera).setOnClickListener {
             openCamera()
         }
@@ -151,7 +157,7 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    // Reads one or more images and adds their D words to the shared list
+    // Reads one or more images and adds the DO number to the shared list
     private fun addImages(uris: List<Uri>) {
         val results = arrayOfNulls<List<String>>(uris.size)
         var finished = 0
@@ -160,7 +166,13 @@ class MainActivity : AppCompatActivity() {
             finished++
             if (finished == uris.size) {
                 // keep the order the images were picked in
-                results.forEach { list -> if (list != null) capturedWords.addAll(list) }
+                results.forEach { list ->
+                    if (list != null) {
+                        capturedWords.addAll(list)
+                        // send only the new items to Firebase
+                        list.forEach { word -> dbRef.push().setValue(word) }
+                    }
+                }
                 showWords()
             }
         }
@@ -187,23 +199,40 @@ class MainActivity : AppCompatActivity() {
 
     private fun showWords() {
         tvResult.text =
-            if (capturedWords.isEmpty()) "No words starting with D found"
+            if (capturedWords.isEmpty()) "No DO number found"
             else capturedWords.joinToString("\n")
     }
 
-    // Returns the words starting with D
+    // Finds the "Number/Date" label and returns the number printed below it
     private fun findDWordList(result: com.google.mlkit.vision.text.Text): List<String> {
-        val words = mutableListOf<String>()
-        for (block in result.textBlocks) {
-            for (line in block.lines) {
-                for (element in line.elements) {
-                    if (element.text.startsWith("D", ignoreCase = true)) {
-                        words.add(element.text)
-                    }
-                }
+        val lines = result.textBlocks.flatMap { it.lines }
+
+        // 1. Find the label line (ignores spaces and capital letters)
+        val label = lines.firstOrNull {
+            it.text.replace(" ", "").contains("Number/Date", ignoreCase = true)
+        } ?: return emptyList()
+        val labelBox = label.boundingBox ?: return emptyList()
+
+        // 2. Find the closest line below the label that sits in the same column
+        val valueLine = lines
+            .filter { it !== label }
+            .filter {
+                val b = it.boundingBox
+                b != null &&
+                        b.top > labelBox.centerY() &&
+                        b.left <= labelBox.right &&
+                        b.right >= labelBox.left
             }
-        }
-        return words
+            .minByOrNull { it.boundingBox!!.top }
+            ?: return emptyList()
+
+        // 3. Take the first element that contains digits ("802141782"),
+        //    skipping "/" and the date "04.11.2026"
+        val number = valueLine.elements
+            .map { it.text }
+            .firstOrNull { text -> text.isNotEmpty() && text.all { it.isDigit() } }
+
+        return listOfNotNull(number)
     }
 
     override fun onDestroy() {
