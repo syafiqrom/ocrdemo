@@ -28,16 +28,23 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.os.Build
+import android.content.ClipData
+import android.content.ClipboardManager
+import androidx.appcompat.app.AlertDialog
 
 class MainActivity : AppCompatActivity() {
-
-    private val secretCode = BuildConfig.SECRET_CODE
+    // Generate random code the first time the app opens and save it on the phone
+    private val secretCode by lazy {
+        val prefs = getSharedPreferences("settings", MODE_PRIVATE)
+        prefs.getString("code", null) ?: java.util.UUID.randomUUID().toString()
+            .replace("-", "")
+            .also { prefs.edit().putString("code", it).apply() }
+    }
 
     private val dbRef by lazy {
         FirebaseDatabase
             .getInstance("https://ocr-star-b3312-default-rtdb.asia-southeast1.firebasedatabase.app")
             .getReference("lists/$secretCode/pending")
-            //.getReference("lists/$secretCode")
     }
     private val recognizer =
         TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
@@ -91,6 +98,22 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnCamera).setOnClickListener {
             openCamera()
         }
+        findViewById<Button>(R.id.btnCode).setOnClickListener {
+            showCode()
+        }
+    }
+
+    private fun showCode() {
+        AlertDialog.Builder(this)
+            .setTitle("Your secret code")
+            .setMessage(secretCode)
+            .setPositiveButton("Copy") { _, _ ->
+                val cm = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+                cm.setPrimaryClip(ClipData.newPlainText("code", secretCode))
+                Toast.makeText(this, "Copied", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Close", null)
+            .show()
     }
 
     private fun openCamera() {

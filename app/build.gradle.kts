@@ -23,7 +23,6 @@ android {
         val props = Properties().apply {
             rootProject.file("local.properties").inputStream().use { load(it) }
         }
-        buildConfigField("String", "SECRET_CODE", "\"${props.getProperty("SECRET_CODE", "")}\"")
     }
 
     buildTypes {
@@ -37,9 +36,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
-    }
-    buildFeatures {
-        buildConfig = true
     }
 }
 
