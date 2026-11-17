@@ -31,6 +31,7 @@ import android.os.Build
 import android.content.ClipData
 import android.content.ClipboardManager
 import androidx.appcompat.app.AlertDialog
+import androidx.core.content.edit
 
 class MainActivity : AppCompatActivity() {
     // Generate random code the first time the app opens and save it on the phone
@@ -38,12 +39,12 @@ class MainActivity : AppCompatActivity() {
         val prefs = getSharedPreferences("settings", MODE_PRIVATE)
         prefs.getString("code", null) ?: java.util.UUID.randomUUID().toString()
             .replace("-", "")
-            .also { prefs.edit().putString("code", it).apply() }
+            .also { prefs.edit { putString("code", it) } }
     }
 
     private val dbRef by lazy {
         FirebaseDatabase
-            .getInstance("https://ocr-star-b3312-default-rtdb.asia-southeast1.firebasedatabase.app")
+            .getInstance(BuildConfig.DB_URL)
             .getReference("lists/$secretCode/pending")
     }
     private val recognizer =
@@ -103,6 +104,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    @Suppress("UsePropertyAccessSyntax")
     private fun showCode() {
         AlertDialog.Builder(this)
             .setTitle("Your secret code")
@@ -202,7 +204,13 @@ class MainActivity : AppCompatActivity() {
             @Suppress("DEPRECATION")
             getSystemService(VIBRATOR_SERVICE) as Vibrator
         }
-        vibrator.vibrate(VibrationEffect.createOneShot(120, VibrationEffect.DEFAULT_AMPLITUDE))
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createOneShot(120, VibrationEffect.DEFAULT_AMPLITUDE))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(120)
+        }
     }
 
     private fun stopCamera() {
@@ -239,6 +247,7 @@ class MainActivity : AppCompatActivity() {
                         onOneDone()
                     }
             } catch (e: Exception) {
+                android.util.Log.e("OCR", "Could not read image", e)
                 results[index] = emptyList()
                 onOneDone()
             }

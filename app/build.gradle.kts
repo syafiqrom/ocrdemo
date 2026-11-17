@@ -21,8 +21,14 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         val props = Properties().apply {
-            rootProject.file("local.properties").inputStream().use { load(it) }
+            val file = rootProject.file("local.properties")
+            if (file.exists()) file.inputStream().use { load(it) }
         }
+        buildConfigField("String", "DB_URL", "\"${props.getProperty("DB_URL", "")}\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {
