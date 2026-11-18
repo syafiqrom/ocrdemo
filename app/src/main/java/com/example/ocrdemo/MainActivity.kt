@@ -32,6 +32,8 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.edit
+import com.example.ocrdemo.R.id.btnCameraText
+import com.example.ocrdemo.R.id.btnCameraQR
 
 class MainActivity : AppCompatActivity() {
     // Generate random code the first time the app opens and save it on the phone
@@ -93,10 +95,13 @@ class MainActivity : AppCompatActivity() {
         previewView = findViewById(R.id.previewView)
         tvResult = findViewById(R.id.tvResult)
 
-        findViewById<Button>(R.id.btnPick).setOnClickListener {
-            pickImages.launch("image/*")
+//        findViewById<Button>(R.id.btnPick).setOnClickListener {
+//            pickImages.launch("image/*")
+//        }
+        findViewById<Button>(btnCameraText).setOnClickListener {
+            openCamera()
         }
-        findViewById<Button>(R.id.btnCamera).setOnClickListener {
+        findViewById<Button>(btnCameraQR).setOnClickListener {
             openCamera()
         }
         findViewById<Button>(R.id.btnCode).setOnClickListener {
@@ -172,7 +177,7 @@ class MainActivity : AppCompatActivity() {
 
         val image = InputImage.fromMediaImage(mediaImage, proxy.imageInfo.rotationDegrees)
         recognizer.process(image)
-            .addOnSuccessListener { result -> confirmAndAdd(findDWordList(result)) }
+            .addOnSuccessListener { result -> confirmAndAdd(findDOText(result)) }
             .addOnCompleteListener { proxy.close() }   // must always close the frame
     }
 
@@ -239,7 +244,7 @@ class MainActivity : AppCompatActivity() {
 
                 recognizer.process(image)
                     .addOnSuccessListener { result ->
-                        results[index] = findDWordList(result)
+                        results[index] = findDOText(result)
                         onOneDone()
                     }
                     .addOnFailureListener {
@@ -275,7 +280,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // Finds the "Number/Date" label and returns the number printed below it
-    private fun findDWordList(result: com.google.mlkit.vision.text.Text): List<String> {
+    private fun findDOText(result: com.google.mlkit.vision.text.Text): List<String> {
         val lines = result.textBlocks.flatMap { it.lines }
 
         // 1. Find the label line (ignores spaces and capital letters)

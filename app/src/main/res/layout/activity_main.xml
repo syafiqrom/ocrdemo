@@ -32,25 +32,50 @@
         android:layout_marginTop="16dp"
         android:orientation="horizontal">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnCamera"
-            style="@style/Widget.Material3.Button"
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/toggleCamera"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginEnd="8dp"
             android:layout_weight="1"
-            android:maxLines="1"
-            android:text="Camera" />
+            app:selectionRequired="false"
+            app:singleSelection="true">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnPick"
-            style="@style/Widget.Material3.Button.TonalButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="8dp"
-            android:layout_weight="1"
-            android:maxLines="1"
-            android:text="Pick image" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnCameraQR"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:checkable="true"
+                android:maxLines="1"
+                android:text="Scan QR"
+                android:textColor="@color/btn_toggle_text"
+                app:backgroundTint="@color/btn_toggle_bg" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnCameraText"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:checkable="true"
+                android:maxLines="1"
+                android:text="Scan Text"
+                android:textColor="@color/btn_toggle_text"
+                app:backgroundTint="@color/btn_toggle_bg" />
+
+            <!--        <com.google.android.material.button.MaterialButton-->
+            <!--            android:id="@+id/btnPick"-->
+            <!--            style="@style/Widget.Material3.Button.TonalButton"-->
+            <!--            android:layout_width="0dp"-->
+            <!--            android:layout_height="wrap_content"-->
+            <!--            android:layout_marginEnd="8dp"-->
+            <!--            android:layout_weight="1"-->
+            <!--            android:maxLines="1"-->
+            <!--            android:text="Pick image" />-->
+
+        </com.google.android.material.button.MaterialButtonToggleGroup>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnCode"

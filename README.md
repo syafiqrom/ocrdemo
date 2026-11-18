@@ -116,7 +116,7 @@ app/src/main/
 
 ## Customizing
 
-- **Different label:** change `"Number/Date"` in `findDWordList()`.
+- **Different label:** change `"Number/Date"` in `findDOText()`.
 - **Different digit count:** change `n.length == 9` in `addNumbers()` and `confirmAndAdd()`.
 - **Scan speed:** change `250` (ms) in `analyzeFrame()`.
 - **Vibration:** edit `vibrateShort()`.
