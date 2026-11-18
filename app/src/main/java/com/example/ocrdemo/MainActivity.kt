@@ -33,12 +33,10 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.os.Build
 import android.content.Intent
-import androidx.core.content.edit
 import com.example.ocrdemo.R.id.btnCameraText
 import com.example.ocrdemo.R.id.btnCameraQR
 
 class MainActivity : AppCompatActivity() {
-    // Generate random code the first time the app opens and save it on the phone
     // Secret code lives in CodeStore; it is shown on the Settings screen
     private val secretCode by lazy { CodeStore.getCode(this) }
 
@@ -85,6 +83,16 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+    // Opens Settings and listens for the "clear list" result
+    private val openSettings =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK &&
+                result.data?.getBooleanExtra("cleared", false) == true
+            ) {
+                clearList()
+            }
+        }
+
     private enum class ScanMode { TEXT, QR }
     private var scanMode = ScanMode.TEXT
 
@@ -96,6 +104,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Generate random code the first time the app opens and save it on the phone
+        CodeStore.getCode(this)
         setContentView(R.layout.activity_main)
 
         imageView = findViewById(R.id.imageView)
@@ -108,7 +118,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<MaterialToolbar>(R.id.topAppBar).setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 R.id.action_settings -> {
-                    startActivity(Intent(this, SettingsActivity::class.java))
+                    openSettings.launch(Intent(this, SettingsActivity::class.java))
                     true
                 }
                 else -> false
@@ -288,6 +298,12 @@ class MainActivity : AppCompatActivity() {
         tvResult.text =
             if (capturedDOs.isEmpty()) "No DO number found"
             else capturedDOs.joinToString("\n")
+    }
+
+    private fun clearList() {
+        capturedDOs.clear()
+        pendingNumber = null
+        tvResult.text = "Recognized text will appear here"
     }
 
     // Finds the "Number/Date" label and returns the DO number printed below it
