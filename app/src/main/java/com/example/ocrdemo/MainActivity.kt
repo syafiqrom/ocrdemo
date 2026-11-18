@@ -23,6 +23,7 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.firebase.database.FirebaseDatabase
+import com.google.android.material.appbar.MaterialToolbar
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -31,21 +32,15 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.os.Build
-import android.content.ClipData
-import android.content.ClipboardManager
-import androidx.appcompat.app.AlertDialog
+import android.content.Intent
 import androidx.core.content.edit
 import com.example.ocrdemo.R.id.btnCameraText
 import com.example.ocrdemo.R.id.btnCameraQR
 
 class MainActivity : AppCompatActivity() {
     // Generate random code the first time the app opens and save it on the phone
-    private val secretCode by lazy {
-        val prefs = getSharedPreferences("settings", MODE_PRIVATE)
-        prefs.getString("code", null) ?: java.util.UUID.randomUUID().toString()
-            .replace("-", "")
-            .also { prefs.edit { putString("code", it) } }
-    }
+    // Secret code lives in CodeStore; it is shown on the Settings screen
+    private val secretCode by lazy { CodeStore.getCode(this) }
 
     private val dbRef by lazy {
         FirebaseDatabase
@@ -110,29 +105,21 @@ class MainActivity : AppCompatActivity() {
 //        findViewById<Button>(R.id.btnPick).setOnClickListener {
 //            pickImages.launch("image/*")
 //        }
+        findViewById<MaterialToolbar>(R.id.topAppBar).setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                R.id.action_settings -> {
+                    startActivity(Intent(this, SettingsActivity::class.java))
+                    true
+                }
+                else -> false
+            }
+        }
         findViewById<Button>(btnCameraText).setOnClickListener {
             openCamera(ScanMode.TEXT)
         }
         findViewById<Button>(btnCameraQR).setOnClickListener {
             openCamera(ScanMode.QR)
         }
-        findViewById<Button>(R.id.btnCode).setOnClickListener {
-            showCode()
-        }
-    }
-
-    @Suppress("UsePropertyAccessSyntax")
-    private fun showCode() {
-        AlertDialog.Builder(this)
-            .setTitle("Your secret code")
-            .setMessage(secretCode)
-            .setPositiveButton("Copy") { _, _ ->
-                val cm = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-                cm.setPrimaryClip(ClipData.newPlainText("code", secretCode))
-                Toast.makeText(this, "Copied", Toast.LENGTH_SHORT).show()
-            }
-            .setNegativeButton("Close", null)
-            .show()
     }
 
     private fun openCamera(mode: ScanMode) {

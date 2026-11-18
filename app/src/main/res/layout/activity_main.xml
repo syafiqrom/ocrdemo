@@ -5,157 +5,145 @@
     android:layout_height="match_parent"
     android:background="?attr/colorSurface"
     android:fitsSystemWindows="true"
-    android:orientation="vertical"
-    android:padding="16dp">
+    android:orientation="vertical">
 
-    <!-- Title -->
-    <TextView
+    <!-- Top app bar -->
+    <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="DO Scanner"
-        android:textColor="?attr/colorOnSurface"
-        android:textSize="24sp"
-        android:textStyle="bold" />
+        android:background="?attr/colorSurface">
 
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:text="Scan a picking list to send its DO number"
-        android:textColor="?attr/colorOnSurfaceVariant"
-        android:textSize="14sp" />
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/topAppBar"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:background="?attr/colorSurface"
+            android:theme="@style/ThemeOverlay.Material3.Dark.ActionBar"
+            app:menu="@menu/main_menu"
+            app:title="DO Scanner"
+            app:titleTextColor="?attr/colorOnSurface" />
+    </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- Action buttons -->
+    <!-- Content area with the original 16dp padding -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:orientation="horizontal">
-
-        <com.google.android.material.button.MaterialButtonToggleGroup
-            android:id="@+id/toggleCamera"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="8dp"
-            android:layout_weight="1"
-            app:selectionRequired="false"
-            app:singleSelection="true">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnCameraQR"
-                style="@style/Widget.Material3.Button.TonalButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:checkable="true"
-                android:maxLines="1"
-                android:text="Scan QR"
-                android:textColor="@color/btn_toggle_text"
-                app:backgroundTint="@color/btn_toggle_bg" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnCameraText"
-                style="@style/Widget.Material3.Button.TonalButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:checkable="true"
-                android:maxLines="1"
-                android:text="Scan Text"
-                android:textColor="@color/btn_toggle_text"
-                app:backgroundTint="@color/btn_toggle_bg" />
-
-            <!--        <com.google.android.material.button.MaterialButton-->
-            <!--            android:id="@+id/btnPick"-->
-            <!--            style="@style/Widget.Material3.Button.TonalButton"-->
-            <!--            android:layout_width="0dp"-->
-            <!--            android:layout_height="wrap_content"-->
-            <!--            android:layout_marginEnd="8dp"-->
-            <!--            android:layout_weight="1"-->
-            <!--            android:maxLines="1"-->
-            <!--            android:text="Pick image" />-->
-
-        </com.google.android.material.button.MaterialButtonToggleGroup>
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnCode"
-            style="?attr/materialButtonOutlinedStyle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:maxLines="1"
-            android:text="Code" />
-    </LinearLayout>
-
-    <!-- Camera preview / picked image -->
-    <com.google.android.material.card.MaterialCardView
-        style="?attr/materialCardViewOutlinedStyle"
-        android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="16dp"
-        android:layout_weight="3"
-        app:cardCornerRadius="20dp"
-        app:cardElevation="0dp">
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:padding="16dp">
 
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="?attr/colorSurfaceVariant">
-
-            <ImageView
-                android:id="@+id/imageView"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:contentDescription="Picked image"
-                android:scaleType="fitCenter" />
-
-            <androidx.camera.view.PreviewView
-                android:id="@+id/previewView"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:visibility="gone" />
-        </FrameLayout>
-    </com.google.android.material.card.MaterialCardView>
-
-    <!-- Results -->
-    <com.google.android.material.card.MaterialCardView
-        style="?attr/materialCardViewOutlinedStyle"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_marginTop="12dp"
-        android:layout_weight="2"
-        app:cardCornerRadius="20dp"
-        app:cardElevation="0dp">
-
+        <!-- Action buttons -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:padding="16dp">
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
 
-            <TextView
-                android:layout_width="wrap_content"
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/toggleCamera"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="SCANNED DO NUMBERS"
-                android:textColor="?attr/colorPrimary"
-                android:textSize="12sp"
-                android:textStyle="bold" />
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                app:selectionRequired="false"
+                app:singleSelection="true">
 
-            <ScrollView
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnCameraQR"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:checkable="true"
+                    android:maxLines="1"
+                    android:text="Scan QR"
+                    android:textColor="@color/btn_toggle_text"
+                    app:backgroundTint="@color/btn_toggle_bg" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnCameraText"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:checkable="true"
+                    android:maxLines="1"
+                    android:text="Scan Text"
+                    android:textColor="@color/btn_toggle_text"
+                    app:backgroundTint="@color/btn_toggle_bg" />
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+        </LinearLayout>
+
+        <!-- Camera preview / picked image -->
+        <com.google.android.material.card.MaterialCardView
+            style="?attr/materialCardViewOutlinedStyle"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="16dp"
+            android:layout_weight="3"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="0dp">
+
+            <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_marginTop="8dp"
-                android:layout_weight="1">
+                android:layout_height="match_parent"
+                android:background="?attr/colorSurfaceVariant">
+
+                <ImageView
+                    android:id="@+id/imageView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:contentDescription="Picked image"
+                    android:scaleType="fitCenter" />
+
+                <androidx.camera.view.PreviewView
+                    android:id="@+id/previewView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="gone" />
+            </FrameLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Results -->
+        <com.google.android.material.card.MaterialCardView
+            style="?attr/materialCardViewOutlinedStyle"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="12dp"
+            android:layout_weight="2"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:padding="16dp">
 
                 <TextView
-                    android:id="@+id/tvResult"
-                    android:layout_width="match_parent"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:lineSpacingExtra="4dp"
-                    android:text="Recognized text will appear here"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textIsSelectable="true"
-                    android:textSize="18sp" />
-            </ScrollView>
-        </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
+                    android:text="SCANNED DO NUMBERS"
+                    android:textColor="?attr/colorPrimary"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <ScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_weight="1">
+
+                    <TextView
+                        android:id="@+id/tvResult"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:lineSpacingExtra="4dp"
+                        android:text="Recognized text will appear here"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textIsSelectable="true"
+                        android:textSize="18sp" />
+                </ScrollView>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+    </LinearLayout>
 </LinearLayout>
