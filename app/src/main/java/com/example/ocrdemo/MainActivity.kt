@@ -19,6 +19,9 @@ import androidx.core.content.ContextCompat
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.barcode.BarcodeScannerOptions
+import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.firebase.database.FirebaseDatabase
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
@@ -64,8 +67,8 @@ class MainActivity : AppCompatActivity() {
     private var pendingNumber: String? = null
     private val analysisExecutor = Executors.newSingleThreadExecutor()
 
-    // Words collected from camera captures (keeps growing)
-    private val capturedWords = mutableListOf<String>()
+    // List of DO number collected from camera captures
+    private val capturedDOs = mutableListOf<String>()
 
     // Gallery picker (multiple images)
     private val pickImages =
@@ -87,6 +90,15 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+    private enum class ScanMode { TEXT, QR }
+    private var scanMode = ScanMode.TEXT
+
+    private val barcodeScanner = BarcodeScanning.getClient(
+        BarcodeScannerOptions.Builder()
+            .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+            .build()
+    )
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -99,10 +111,10 @@ class MainActivity : AppCompatActivity() {
 //            pickImages.launch("image/*")
 //        }
         findViewById<Button>(btnCameraText).setOnClickListener {
-            openCamera()
+            openCamera(ScanMode.TEXT)
         }
         findViewById<Button>(btnCameraQR).setOnClickListener {
-            openCamera()
+            openCamera(ScanMode.QR)
         }
         findViewById<Button>(R.id.btnCode).setOnClickListener {
             showCode()
@@ -123,7 +135,10 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun openCamera() {
+    private fun openCamera(mode: ScanMode) {
+        scanMode = mode
+        pendingNumber = null   // reset the 2-in-a-row check when switching modes
+
         val hasPermission = ContextCompat.checkSelfPermission(
             this, Manifest.permission.CAMERA
         ) == PackageManager.PERMISSION_GRANTED
@@ -176,9 +191,18 @@ class MainActivity : AppCompatActivity() {
         lastScanTime = now
 
         val image = InputImage.fromMediaImage(mediaImage, proxy.imageInfo.rotationDegrees)
-        recognizer.process(image)
-            .addOnSuccessListener { result -> confirmAndAdd(findDOText(result)) }
-            .addOnCompleteListener { proxy.close() }   // must always close the frame
+
+        when (scanMode) {
+            ScanMode.TEXT -> recognizer.process(image)
+                .addOnSuccessListener { result -> confirmAndAdd(findDOText(result)) }
+                .addOnCompleteListener { proxy.close() }
+
+            ScanMode.QR -> barcodeScanner.process(image)
+                .addOnSuccessListener { barcodes ->
+                    confirmAndAdd(barcodes.mapNotNull { it.rawValue?.trim() })
+                }
+                .addOnCompleteListener { proxy.close() }
+        }
     }
 
     // Camera only: a number must be seen in 2 consecutive scans before it is added
@@ -189,7 +213,7 @@ class MainActivity : AppCompatActivity() {
             pendingNumber = null          // nothing valid this frame, start over
             return
         }
-        if (candidate in capturedWords) {
+        if (candidate in capturedDOs) {
             pendingNumber = null          // already in the list, ignore
             return
         }
@@ -234,7 +258,7 @@ class MainActivity : AppCompatActivity() {
             if (finished == uris.size) {
                 // keep the order the images were picked in
                 results.forEach { list -> if (list != null) addNumbers(list) }
-                showWords()
+                showDOs()
             }
         }
 
@@ -263,27 +287,27 @@ class MainActivity : AppCompatActivity() {
     private fun addNumbers(numbers: List<String>): Boolean {
         var added = false
         for (n in numbers) {
-            if (n.length == 9 && n.all { it.isDigit() } && n !in capturedWords) {
-                capturedWords.add(n)
+            if (n.length == 9 && n.all { it.isDigit() } && n !in capturedDOs) {
+                capturedDOs.add(n)
                 dbRef.push().setValue(n)
                 added = true
             }
         }
-        if (added) showWords()
+        if (added) showDOs()
         return added
     }
 
-    private fun showWords() {
+    private fun showDOs() {
         tvResult.text =
-            if (capturedWords.isEmpty()) "No DO number found"
-            else capturedWords.joinToString("\n")
+            if (capturedDOs.isEmpty()) "No DO number found"
+            else capturedDOs.joinToString("\n")
     }
 
-    // Finds the "Number/Date" label and returns the number printed below it
+    // Finds the "Number/Date" label and returns the DO number printed below it
     private fun findDOText(result: com.google.mlkit.vision.text.Text): List<String> {
         val lines = result.textBlocks.flatMap { it.lines }
 
-        // 1. Find the label line (ignores spaces and capital letters)
+        // 1. Find the label line
         val label = lines.firstOrNull {
             it.text.replace(" ", "").contains("Number/Date", ignoreCase = true)
         } ?: return emptyList()
@@ -315,6 +339,7 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         cameraProvider?.unbindAll()
         recognizer.close()
+        barcodeScanner.close()
         analysisExecutor.shutdown()
     }
 }
