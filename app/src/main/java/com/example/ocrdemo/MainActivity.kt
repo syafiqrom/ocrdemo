@@ -23,6 +23,10 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.DatabaseReference
+import com.google.firebase.database.ValueEventListener
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.button.MaterialButton
@@ -45,10 +49,10 @@ class MainActivity : AppCompatActivity() {
     // Secret code lives in CodeStore; it is shown on the Settings screen
     private val secretCode by lazy { CodeStore.getCode(this) }
 
+    private val db by lazy { FirebaseDatabase.getInstance(BuildConfig.DB_URL) }
+
     private val dbRef by lazy {
-        FirebaseDatabase
-            .getInstance(BuildConfig.DB_URL)
-            .getReference("lists/$secretCode/pending")
+        db.getReference("lists/$secretCode/pending")
     }
     private val recognizer =
         TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
@@ -62,6 +66,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tilInput: TextInputLayout
     private lateinit var etInput: TextInputEditText
     private lateinit var btnSubmit: MaterialButton
+
+    // Status
+    private var statusReady = false
+    private var lastWarnTime = 0L
+    private var statusRef: DatabaseReference? = null
+    private var statusListener: ValueEventListener? = null
 
     private var cameraProvider: ProcessCameraProvider? = null
     private var imageAnalysis: ImageAnalysis? = null
@@ -137,6 +147,8 @@ class MainActivity : AppCompatActivity() {
             previewCard.visibility = View.GONE
             inputGroup.visibility = View.VISIBLE
         }
+        listenStatus()
+        onCreateInputGroup()
         onCreateInputGroup()
     }
 
@@ -295,6 +307,12 @@ class MainActivity : AppCompatActivity() {
 
     // Adds only valid, new numbers, and sends only those to Firebase
     private fun addNumbers(numbers: List<String>): Boolean {
+        // check if the correct url and extension is opened
+        if (!isExtensionReady()) {
+            warnNotReady()
+            return false
+        }
+
         var added = false
         for (n in numbers) {
             if (n.length == 9 && n.all { it.isDigit() } && n !in capturedDOs) {
@@ -353,9 +371,32 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        statusListener?.let { statusRef?.removeEventListener(it) }
         cameraProvider?.unbindAll()
         recognizer.close()
         barcodeScanner.close()
         analysisExecutor.shutdown()
+    }
+
+    private fun listenStatus() {
+        statusRef = db.getReference("lists/$secretCode/status")
+        statusListener = object : ValueEventListener {
+            override fun onDataChange(s: DataSnapshot) {
+                statusReady = s.child("ready").getValue(Boolean::class.java) ?: false
+            }
+            override fun onCancelled(e: DatabaseError) {}
+        }
+        statusRef!!.addValueEventListener(statusListener!!)
+    }
+
+    private fun isExtensionReady() = statusReady
+
+    private fun warnNotReady() {
+        val now = System.currentTimeMillis()
+        if (now - lastWarnTime < 4000) return
+        lastWarnTime = now
+        Toast.makeText(this,
+            "Not connected. Open the correct page and the extension panel.",
+            Toast.LENGTH_LONG).show()
     }
 }
