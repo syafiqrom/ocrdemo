@@ -41,6 +41,11 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.os.Build
 import android.content.Intent
+import android.graphics.Color
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
+import android.text.style.ImageSpan
 import com.example.ocrdemo.R.id.btnCameraText
 import com.example.ocrdemo.R.id.btnCameraQR
 import com.example.ocrdemo.R.id.btnEnterText
@@ -72,6 +77,14 @@ class MainActivity : AppCompatActivity() {
     private var lastWarnTime = 0L
     private var statusRef: DatabaseReference? = null
     private var statusListener: ValueEventListener? = null
+
+    // Results from the extension
+    private val doneNumbers = mutableSetOf<String>()
+    private val failedNumbers = mutableSetOf<String>()
+    private var doneRef: DatabaseReference? = null
+    private var failedRef: DatabaseReference? = null
+    private var doneListener: ValueEventListener? = null
+    private var failedListener: ValueEventListener? = null
 
     private var cameraProvider: ProcessCameraProvider? = null
     private var imageAnalysis: ImageAnalysis? = null
@@ -148,7 +161,7 @@ class MainActivity : AppCompatActivity() {
             inputGroup.visibility = View.VISIBLE
         }
         listenStatus()
-        onCreateInputGroup()
+        listenResults()
         onCreateInputGroup()
     }
 
@@ -173,6 +186,11 @@ class MainActivity : AppCompatActivity() {
             }
             text.length != 9 -> {
                 tilInput.error = "DO number must be 9 digits"
+                return
+            }
+            // check if duplicate
+            text in capturedDOs -> {
+                tilInput.error = "This DO number is already in the list"
                 return
             }
         }
@@ -326,9 +344,37 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showDOs() {
-        tvResult.text =
-            if (capturedDOs.isEmpty()) "No DO number found"
-            else capturedDOs.asReversed().joinToString("\n")
+        if (capturedDOs.isEmpty()) {
+            tvResult.text = "No DO number found"
+            return
+        }
+        val sb = SpannableStringBuilder()
+        capturedDOs.asReversed().forEachIndexed { i, n ->
+            if (i > 0) sb.append("\n")
+            sb.append(n)
+
+            val iconRes = when {
+                n in doneNumbers -> R.drawable.ic_check_circle
+                n in failedNumbers -> R.drawable.ic_cancel
+                else -> null
+            }
+            if (iconRes != null) {
+                sb.append("  ")  // gap, then a placeholder character the icon replaces
+                sb.setSpan(
+                    iconSpan(iconRes),
+                    sb.length - 1, sb.length,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+            }
+        }
+        tvResult.text = sb
+    }
+
+    private fun iconSpan(resId: Int): ImageSpan {
+        val d = ContextCompat.getDrawable(this, resId)!!
+        val size = (tvResult.textSize * 1.1f).toInt()  // scales with the 18sp text
+        d.setBounds(0, 0, size, size)
+        return ImageSpan(d, ImageSpan.ALIGN_BASELINE)
     }
 
     private fun clearList() {
@@ -372,6 +418,8 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         statusListener?.let { statusRef?.removeEventListener(it) }
+        doneListener?.let { doneRef?.removeEventListener(it) }
+        failedListener?.let { failedRef?.removeEventListener(it) }
         cameraProvider?.unbindAll()
         recognizer.close()
         barcodeScanner.close()
@@ -398,5 +446,31 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this,
             "Not connected. Open the correct page and the extension panel.",
             Toast.LENGTH_LONG).show()
+    }
+
+    private fun listenResults() {
+        doneRef = db.getReference("lists/$secretCode/done")
+        doneListener = object : ValueEventListener {
+            override fun onDataChange(s: DataSnapshot) {
+                doneNumbers.clear()
+                s.children.forEach { c -> c.value?.toString()?.let { doneNumbers.add(it) } }
+                if (capturedDOs.isNotEmpty()) showDOs()
+            }
+            override fun onCancelled(e: DatabaseError) {}
+        }
+        doneRef!!.addValueEventListener(doneListener!!)
+
+        failedRef = db.getReference("lists/$secretCode/failed")
+        failedListener = object : ValueEventListener {
+            override fun onDataChange(s: DataSnapshot) {
+                failedNumbers.clear()
+                s.children.forEach { c ->
+                    c.child("number").value?.toString()?.let { failedNumbers.add(it) }
+                }
+                if (capturedDOs.isNotEmpty()) showDOs()
+            }
+            override fun onCancelled(e: DatabaseError) {}
+        }
+        failedRef!!.addValueEventListener(failedListener!!)
     }
 }
