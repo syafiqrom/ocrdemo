@@ -137,6 +137,11 @@ class MainActivity : AppCompatActivity() {
         tvResult = findViewById(R.id.tvResult)
         previewCard = findViewById(R.id.previewCard)
 
+        savedInstanceState?.getStringArrayList("captured")?.let {
+            capturedDOs.addAll(it)
+            if (capturedDOs.isNotEmpty()) showDOs()
+        }
+
         findViewById<MaterialToolbar>(R.id.topAppBar).setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 R.id.action_settings -> {
@@ -472,5 +477,10 @@ class MainActivity : AppCompatActivity() {
             override fun onCancelled(e: DatabaseError) {}
         }
         failedRef!!.addValueEventListener(failedListener!!)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putStringArrayList("captured", ArrayList(capturedDOs))
     }
 }

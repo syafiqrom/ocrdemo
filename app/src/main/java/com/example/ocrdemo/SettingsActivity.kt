@@ -10,6 +10,8 @@ import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import androidx.appcompat.app.AppCompatDelegate
+import com.google.android.material.button.MaterialButtonToggleGroup
 class SettingsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,6 +40,26 @@ class SettingsActivity : AppCompatActivity() {
                     Toast.makeText(this, "List cleared", Toast.LENGTH_SHORT).show()
                 }
                 .show()
+        }
+
+        val themeGroup = findViewById<MaterialButtonToggleGroup>(R.id.toggleTheme)
+        themeGroup.check(
+            when (ThemeStore.get(this)) {
+                AppCompatDelegate.MODE_NIGHT_NO -> R.id.btnThemeLight
+                AppCompatDelegate.MODE_NIGHT_YES -> R.id.btnThemeDark
+                else -> R.id.btnThemeSystem
+            }
+        )
+        themeGroup.addOnButtonCheckedListener { _, id, checked ->
+            if (!checked) return@addOnButtonCheckedListener
+            ThemeStore.set(
+                this,
+                when (id) {
+                    R.id.btnThemeLight -> AppCompatDelegate.MODE_NIGHT_NO
+                    R.id.btnThemeDark -> AppCompatDelegate.MODE_NIGHT_YES
+                    else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+                }
+            )
         }
     }
 }
