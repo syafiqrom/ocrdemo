@@ -6,8 +6,8 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.widget.Button
-import android.widget.ImageView
 import android.widget.TextView
+import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -24,6 +24,10 @@ import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.firebase.database.FirebaseDatabase
 import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.card.MaterialCardView
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -35,6 +39,7 @@ import android.os.Build
 import android.content.Intent
 import com.example.ocrdemo.R.id.btnCameraText
 import com.example.ocrdemo.R.id.btnCameraQR
+import com.example.ocrdemo.R.id.btnEnterText
 
 class MainActivity : AppCompatActivity() {
     // Secret code lives in CodeStore; it is shown on the Settings screen
@@ -48,9 +53,15 @@ class MainActivity : AppCompatActivity() {
     private val recognizer =
         TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
-    private lateinit var imageView: ImageView
     private lateinit var previewView: PreviewView
+    private lateinit var previewCard: MaterialCardView
     private lateinit var tvResult: TextView
+    private lateinit var inputGroup: LinearLayout
+
+    // Input Group
+    private lateinit var tilInput: TextInputLayout
+    private lateinit var etInput: TextInputEditText
+    private lateinit var btnSubmit: MaterialButton
 
     private var cameraProvider: ProcessCameraProvider? = null
     private var imageAnalysis: ImageAnalysis? = null
@@ -62,16 +73,6 @@ class MainActivity : AppCompatActivity() {
 
     // List of DO number collected from camera captures
     private val capturedDOs = mutableListOf<String>()
-
-    // Gallery picker (multiple images)
-    private val pickImages =
-        registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris: List<Uri> ->
-            if (uris.isNotEmpty()) {
-                stopCamera()
-                imageView.setImageURI(uris[0])
-                addImages(uris)
-            }
-        }
 
     // Asks for camera permission
     private val requestPermission =
@@ -108,13 +109,11 @@ class MainActivity : AppCompatActivity() {
         CodeStore.getCode(this)
         setContentView(R.layout.activity_main)
 
-        imageView = findViewById(R.id.imageView)
         previewView = findViewById(R.id.previewView)
+        inputGroup = findViewById(R.id.inputGroup)
         tvResult = findViewById(R.id.tvResult)
+        previewCard = findViewById(R.id.previewCard)
 
-//        findViewById<Button>(R.id.btnPick).setOnClickListener {
-//            pickImages.launch("image/*")
-//        }
         findViewById<MaterialToolbar>(R.id.topAppBar).setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 R.id.action_settings -> {
@@ -124,12 +123,60 @@ class MainActivity : AppCompatActivity() {
                 else -> false
             }
         }
-        findViewById<Button>(btnCameraText).setOnClickListener {
-            openCamera(ScanMode.TEXT)
-        }
         findViewById<Button>(btnCameraQR).setOnClickListener {
+            hideKeyboard()
             openCamera(ScanMode.QR)
         }
+        findViewById<Button>(btnCameraText).setOnClickListener {
+            hideKeyboard()
+            openCamera(ScanMode.TEXT)
+        }
+        findViewById<Button>(btnEnterText).setOnClickListener {
+            cameraProvider?.unbindAll()
+            previewView.visibility = View.GONE
+            previewCard.visibility = View.GONE
+            inputGroup.visibility = View.VISIBLE
+        }
+        onCreateInputGroup()
+    }
+
+    private fun onCreateInputGroup() {
+        tilInput = findViewById(R.id.tilInput)
+        etInput = findViewById(R.id.etInput)
+        btnSubmit = findViewById(R.id.btnSubmit)
+
+        btnSubmit.setOnClickListener { submit() }
+
+        // Clear the error as soon as the user starts typing again
+        etInput.setOnFocusChangeListener { _, _ -> tilInput.error = null }
+    }
+
+    private fun submit() {
+        val text = etInput.text?.toString()?.trim().orEmpty()
+
+        when {
+            text.isEmpty() -> {
+                tilInput.error = "Please enter something"
+                return
+            }
+            text.length != 9 -> {
+                tilInput.error = "DO number must be 9 digits"
+                return
+            }
+        }
+
+        tilInput.error = null
+
+        if (addNumbers(listOf(text))) {
+            vibrateShort()
+            etInput.text?.clear()
+        }
+    }
+
+    private fun hideKeyboard(){
+        val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE)
+                as android.view.inputmethod.InputMethodManager
+        imm.hideSoftInputFromWindow(etInput.windowToken, 0)
     }
 
     private fun openCamera(mode: ScanMode) {
@@ -145,8 +192,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startCamera() {
+        previewCard.visibility = View.VISIBLE
         previewView.visibility = View.VISIBLE
-        imageView.visibility = View.GONE
+        inputGroup.visibility = View.GONE
 
         val future = ProcessCameraProvider.getInstance(this)
         future.addListener({
@@ -242,42 +290,7 @@ class MainActivity : AppCompatActivity() {
     private fun stopCamera() {
         cameraProvider?.unbindAll()
         previewView.visibility = View.GONE
-        imageView.visibility = View.VISIBLE
-    }
-
-    // Reads one or more images and adds the DO number to the shared list
-    private fun addImages(uris: List<Uri>) {
-        val results = arrayOfNulls<List<String>>(uris.size)
-        var finished = 0
-
-        fun onOneDone() {
-            finished++
-            if (finished == uris.size) {
-                // keep the order the images were picked in
-                results.forEach { list -> if (list != null) addNumbers(list) }
-                showDOs()
-            }
-        }
-
-        uris.forEachIndexed { index, uri ->
-            try {
-                val image = InputImage.fromFilePath(this, uri)
-
-                recognizer.process(image)
-                    .addOnSuccessListener { result ->
-                        results[index] = findDOText(result)
-                        onOneDone()
-                    }
-                    .addOnFailureListener {
-                        results[index] = emptyList()
-                        onOneDone()
-                    }
-            } catch (e: Exception) {
-                android.util.Log.e("OCR", "Could not read image", e)
-                results[index] = emptyList()
-                onOneDone()
-            }
-        }
+        inputGroup.visibility = View.GONE
     }
 
     // Adds only valid, new numbers, and sends only those to Firebase
@@ -297,7 +310,7 @@ class MainActivity : AppCompatActivity() {
     private fun showDOs() {
         tvResult.text =
             if (capturedDOs.isEmpty()) "No DO number found"
-            else capturedDOs.joinToString("\n")
+            else capturedDOs.asReversed().joinToString("\n")
     }
 
     private fun clearList() {

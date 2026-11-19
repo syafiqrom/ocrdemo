@@ -49,7 +49,7 @@
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnCameraQR"
-                    style="@style/Widget.Material3.Button.TonalButton"
+                    style="@style/Widget.Material3.Button"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
@@ -61,7 +61,7 @@
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnCameraText"
-                    style="@style/Widget.Material3.Button.TonalButton"
+                    style="@style/Widget.Material3.Button"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
@@ -70,12 +70,26 @@
                     android:text="Scan Text"
                     android:textColor="@color/btn_toggle_text"
                     app:backgroundTint="@color/btn_toggle_bg" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnEnterText"
+                    style="@style/Widget.Material3.Button"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:checkable="true"
+                    android:maxLines="1"
+                    android:text="Enter Text"
+                    android:textColor="@color/btn_toggle_text"
+                    app:backgroundTint="@color/btn_toggle_bg" />
+
             </com.google.android.material.button.MaterialButtonToggleGroup>
         </LinearLayout>
 
-        <!-- Camera preview / picked image -->
+        <!-- Camera preview -->
         <com.google.android.material.card.MaterialCardView
             style="?attr/materialCardViewOutlinedStyle"
+            android:id="@+id/previewCard"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_marginTop="16dp"
@@ -88,13 +102,6 @@
                 android:layout_height="match_parent"
                 android:background="?attr/colorSurfaceVariant">
 
-                <ImageView
-                    android:id="@+id/imageView"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:contentDescription="Picked image"
-                    android:scaleType="fitCenter" />
-
                 <androidx.camera.view.PreviewView
                     android:id="@+id/previewView"
                     android:layout_width="match_parent"
@@ -102,6 +109,42 @@
                     android:visibility="gone" />
             </FrameLayout>
         </com.google.android.material.card.MaterialCardView>
+
+        <!-- Manual Enter Text -->
+        <LinearLayout
+            android:id="@+id/inputGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/tilInput"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="DO Number"
+                app:endIconMode="clear_text">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:imeOptions="actionDone"
+                    android:inputType="number"
+                    android:maxLength="9"
+                    android:maxLines="1" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSubmit"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Submit" />
+        </LinearLayout>
 
         <!-- Results -->
         <com.google.android.material.card.MaterialCardView
