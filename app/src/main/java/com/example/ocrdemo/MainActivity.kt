@@ -15,7 +15,6 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.core.content.ContextCompat
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -32,6 +31,8 @@ import com.google.android.material.card.MaterialCardView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
+import com.google.android.material.snackbar.Snackbar
+import androidx.core.content.ContextCompat
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -93,6 +94,8 @@ class MainActivity : AppCompatActivity() {
     // Candidate number seen in the previous frame (for the 2-in-a-row check)
     private var pendingNumber: String? = null
     private val analysisExecutor = Executors.newSingleThreadExecutor()
+    private var lastDupTime = 0L
+    private var lastDupNumber: String? = null
 
     // List of DO number collected from camera captures
     private val capturedDOs = mutableListOf<String>()
@@ -290,19 +293,25 @@ class MainActivity : AppCompatActivity() {
         val candidate = numbers.firstOrNull { it.length == 9 && it.all { c -> c.isDigit() } }
 
         if (candidate == null) {
-            pendingNumber = null          // nothing valid this frame, start over
+            pendingNumber = null
             return
         }
         if (candidate in capturedDOs) {
-            pendingNumber = null          // already in the list, ignore
+            pendingNumber = null
+            notifyDuplicate(candidate)      // new
             return
         }
 
         if (candidate == pendingNumber) {
             pendingNumber = null
-            if (addNumbers(listOf(candidate))) vibrateShort()
+            if (addNumbers(listOf(candidate))) {
+                vibrateShort()
+                lastDupNumber = candidate
+                lastDupTime = System.currentTimeMillis()
+                showSnack("Added $candidate", Color.parseColor("#2E7D32"))
+            }
         } else {
-            pendingNumber = candidate     // first sighting, wait for the next frame
+            pendingNumber = candidate
         }
     }
 
@@ -482,5 +491,22 @@ class MainActivity : AppCompatActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putStringArrayList("captured", ArrayList(capturedDOs))
+    }
+
+    private fun showSnack(message: String, bgColor: Int) {
+        Snackbar.make(findViewById(android.R.id.content), message, Snackbar.LENGTH_SHORT)
+            .setBackgroundTint(bgColor)
+            .setTextColor(Color.WHITE)
+            .also { it.show() }
+    }
+
+    private fun notifyDuplicate(number: String) {
+        val now = System.currentTimeMillis()
+        // Only warn once per number every 3 seconds
+        if (number == lastDupNumber && now - lastDupTime < 3000) return
+
+        lastDupNumber = number
+        lastDupTime = now
+        showSnack("$number is already in the list", Color.parseColor("#C62828"))
     }
 }
